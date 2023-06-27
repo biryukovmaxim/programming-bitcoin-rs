@@ -48,18 +48,16 @@ impl Sub for FieldElement {
     fn sub(self, rhs: Self) -> Self::Output {
         if self.prime != rhs.prime {
             Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else if self.num >= rhs.num {
+            Ok(Self {
+                num: self.num.sub(rhs.num),
+                ..self
+            })
         } else {
-            if self.num >= rhs.num {
-                Ok(Self {
-                    num: self.num.sub(rhs.num),
-                    ..self
-                })
-            } else {
-                Ok(Self {
-                    num: rhs.prime - rhs.num.sub(self.num),
-                    ..self
-                })
-            }
+            Ok(Self {
+                num: rhs.prime - rhs.num.sub(self.num),
+                ..self
+            })
         }
     }
 }
