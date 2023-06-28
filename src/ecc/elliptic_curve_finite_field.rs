@@ -21,7 +21,7 @@ struct Point {
     coordinate: Option<Coordinate>,
     curve: CurveOverFiniteField,
 }
-/*
+
 impl PartialEq<Point> for Point {
     fn eq(&self, other: &Point) -> bool {
         self.curve == other.curve && self.coordinate == other.coordinate
@@ -33,7 +33,7 @@ impl PartialEq<&Point> for Point {
         self.curve == other.curve && self.coordinate == other.coordinate
     }
 }
-
+/*
 impl Add for &Point {
     type Output = Point;
 
@@ -138,6 +138,7 @@ impl Point {
 mod tests {
     use super::*;
     use num_bigint::BigInt;
+
     #[test]
     fn test_on_curve() {
         let prime = BigInt::from(223);
