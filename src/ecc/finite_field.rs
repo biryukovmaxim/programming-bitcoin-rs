@@ -11,6 +11,74 @@ pub struct FieldElement {
     pub prime: BigInt,
 }
 
+impl Div for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            let num = (&self.num
+                * &(rhs.num).modpow(&(&self.prime).sub(&BigInt::from(2)), &rhs.prime))
+                % &rhs.prime;
+            Ok(FieldElement {
+                num,
+                prime: self.prime.clone(),
+            })
+        }
+    }
+}
+
+impl Mul for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            Ok(FieldElement {
+                num: (&self.num).mul(&rhs.num).mod_floor(&self.prime),
+                prime: self.prime.clone(),
+            })
+        }
+    }
+}
+
+impl Sub for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else if self.num >= rhs.num {
+            Ok(FieldElement {
+                num: (&self.num).sub(&rhs.num),
+                prime: self.prime.clone(),
+            })
+        } else {
+            Ok(FieldElement {
+                num: &rhs.prime - (&rhs.num).sub(&self.num),
+                prime: rhs.prime.clone(),
+            })
+        }
+    }
+}
+
+impl Add for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            Ok(FieldElement {
+                num: (&self.num).add(&rhs.num).mod_floor(&self.prime),
+                prime: self.prime.clone(),
+            })
+        }
+    }
+}
+
 impl Div for FieldElement {
     type Output = Result<FieldElement>;
 
@@ -89,7 +157,7 @@ impl FieldElement {
         }
     }
 
-    fn pow(self, rhs: impl Into<BigInt>) -> Self {
+    pub fn pow(&self, rhs: impl Into<BigInt>) -> Self {
         let exponent = rhs.into();
         let exponent = if exponent.lt(&0i32.into()) {
             BigInt::from(-1i64).add(&self.prime).add(&exponent)
@@ -99,7 +167,7 @@ impl FieldElement {
 
         Self {
             num: self.num.modpow(&exponent, &self.prime),
-            ..self
+            prime: self.prime.clone(),
         }
     }
 }
