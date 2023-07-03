@@ -347,10 +347,40 @@ mod tests {
             )
             .unwrap()
         );
-        let additions = vec![
-            [(192, 105), (17, 56), (170, 142)],
-            [(47, 71), (117, 141), (60, 139)],
-            [(143, 98), (76, 66), (47, 71)],
+
+        let additions = [
+            ((192, 105), (17, 56), (170, 142)),
+            ((47, 71), (117, 141), (60, 139)),
+            ((143, 98), (76, 66), (47, 71)),
         ];
+
+        for ((x1, y1), (x2, y2), (x3, y3)) in additions {
+            let p1 = Point::new(
+                Some(Coordinate::new(
+                    FieldElement::new(x1, prime.clone()).unwrap(),
+                    FieldElement::new(y1, prime.clone()).unwrap(),
+                )),
+                curve.clone(),
+            )
+            .unwrap();
+            let p2 = Point::new(
+                Some(Coordinate::new(
+                    FieldElement::new(x2, prime.clone()).unwrap(),
+                    FieldElement::new(y2, prime.clone()).unwrap(),
+                )),
+                curve.clone(),
+            )
+            .unwrap();
+            let p3 = Point::new(
+                Some(Coordinate::new(
+                    FieldElement::new(x3, prime.clone()).unwrap(),
+                    FieldElement::new(y3, prime.clone()).unwrap(),
+                )),
+                curve.clone(),
+            )
+            .unwrap();
+
+            assert_eq!(p1.add(p2).unwrap(), p3);
+        }
     }
 }
