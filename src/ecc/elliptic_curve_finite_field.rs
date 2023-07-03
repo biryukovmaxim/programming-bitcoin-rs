@@ -1,6 +1,6 @@
 use crate::ecc::finite_field::FieldElement;
 use num_bigint::BigInt;
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 //y^2 = x^3 + A*x + B
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,6 +43,39 @@ impl Coordinate {
 struct Point {
     coordinate: Option<Coordinate>,
     curve: CurveOverFiniteField,
+}
+
+impl Mul<&BigInt> for Point {
+    type Output = Point;
+
+    fn mul(self, rhs: &BigInt) -> Self::Output {
+        (&self).mul(rhs)
+    }
+}
+
+impl Mul<BigInt> for Point {
+    type Output = Point;
+
+    fn mul(self, rhs: BigInt) -> Self::Output {
+        (&self).mul(&rhs)
+    }
+}
+
+impl Mul<&BigInt> for &Point {
+    type Output = Point;
+
+    fn mul(self, rhs: &BigInt) -> Self::Output {
+        if rhs == &BigInt::default() {
+            todo!()
+        }
+        let mut cursor = BigInt::from(1);
+        let mut res = self.clone();
+        while &cursor < rhs {
+            res = (res + self).unwrap();
+            cursor += 1;
+        }
+        res
+    }
 }
 
 impl Point {
@@ -381,6 +414,47 @@ mod tests {
             .unwrap();
 
             assert_eq!(p1.add(p2).unwrap(), p3);
+        }
+    }
+    #[test]
+    fn test_mul() {
+        let prime = BigInt::from(223);
+        let a = FieldElement::new(0, prime.clone()).unwrap();
+        let b = FieldElement::new(7, prime.clone()).unwrap();
+        let curve = CurveOverFiniteField::new(a, b);
+
+        let multiplications = [
+            (2, (192, 105), Some((49, 71))),
+            (2, (143, 98), Some((64, 168))),
+            (2, (47, 71), Some((36, 111))),
+            (4, (47, 71), Some((194, 51))),
+            (8, (47, 71), Some((116, 55))),
+            (21, (47, 71), None),
+        ];
+
+        for (s, (x1, y1), c2) in multiplications {
+            let p1 = Point::new(
+                Some(Coordinate::new(
+                    FieldElement::new(x1, prime.clone()).unwrap(),
+                    FieldElement::new(y1, prime.clone()).unwrap(),
+                )),
+                curve.clone(),
+            )
+            .unwrap();
+            let p2 = if let Some((x2, y2)) = c2 {
+                Point::new(
+                    Some(Coordinate::new(
+                        FieldElement::new(x2, prime.clone()).unwrap(),
+                        FieldElement::new(y2, prime.clone()).unwrap(),
+                    )),
+                    curve.clone(),
+                )
+                .unwrap()
+            } else {
+                Point::new(None, curve.clone()).unwrap()
+            };
+
+            assert_eq!(p1 * BigInt::from(s), p2);
         }
     }
 }
