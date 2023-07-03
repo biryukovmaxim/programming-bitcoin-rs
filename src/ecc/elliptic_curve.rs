@@ -110,7 +110,7 @@ impl Add for Point {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
-struct Coordinate {
+pub struct Coordinate {
     x: BigInt,
     y: BigInt,
 }

@@ -11,100 +11,74 @@ pub struct FieldElement {
     pub prime: BigInt,
 }
 
-impl Div for &FieldElement {
-    type Output = Result<FieldElement>;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        if self.prime != rhs.prime {
-            Err(anyhow!("Cannot add two numbers in different Fields"))
+impl FieldElement {
+    pub fn new(num: impl Into<BigInt>, prime: impl Into<BigInt>) -> Result<Self> {
+        let prime = prime.into();
+        let (num, prime) = (num.into() % &prime, prime);
+        if prime.lt(&num) {
+            Err(anyhow!(
+                "prime should be gt value, got num: {num}, prime: {prime}"
+            ))
         } else {
-            let num = (&self.num
-                * &(rhs.num).modpow(&(&self.prime).sub(&BigInt::from(2)), &rhs.prime))
-                % &rhs.prime;
-            Ok(FieldElement {
-                num,
-                prime: self.prime.clone(),
-            })
+            Ok(Self { num, prime })
+        }
+    }
+
+    pub fn pow(&self, rhs: impl Into<BigInt>) -> Self {
+        let exponent = rhs.into();
+        let exponent = if exponent.lt(&0i32.into()) {
+            BigInt::from(-1i64).add(&self.prime).add(&exponent)
+        } else {
+            exponent
+        };
+
+        Self {
+            num: self.num.modpow(&exponent, &self.prime),
+            prime: self.prime.clone(),
         }
     }
 }
 
-impl Mul for &FieldElement {
-    type Output = Result<FieldElement>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.prime != rhs.prime {
-            Err(anyhow!("Cannot add two numbers in different Fields"))
-        } else {
-            Ok(FieldElement {
-                num: (&self.num).mul(&rhs.num).mod_floor(&self.prime),
-                prime: self.prime.clone(),
-            })
-        }
-    }
-}
-
-impl Sub for &FieldElement {
-    type Output = Result<FieldElement>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        if self.prime != rhs.prime {
-            Err(anyhow!("Cannot add two numbers in different Fields"))
-        } else if self.num >= rhs.num {
-            Ok(FieldElement {
-                num: (&self.num).sub(&rhs.num),
-                prime: self.prime.clone(),
-            })
-        } else {
-            Ok(FieldElement {
-                num: &rhs.prime - (&rhs.num).sub(&self.num),
-                prime: rhs.prime.clone(),
-            })
-        }
-    }
-}
-
-impl Add for &FieldElement {
+impl Add for FieldElement {
     type Output = Result<FieldElement>;
 
     fn add(self, rhs: Self) -> Self::Output {
         if self.prime != rhs.prime {
             Err(anyhow!("Cannot add two numbers in different Fields"))
         } else {
+            Ok(Self {
+                num: self.num.add(rhs.num).mod_floor(&self.prime),
+                ..self
+            })
+        }
+    }
+}
+
+impl Add<&FieldElement> for FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn add(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            Ok(FieldElement {
+                num: (&self.num).add(&rhs.num).mod_floor(&self.prime),
+                prime: self.prime,
+            })
+        }
+    }
+}
+
+impl Add<&FieldElement> for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn add(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
             Ok(FieldElement {
                 num: (&self.num).add(&rhs.num).mod_floor(&self.prime),
                 prime: self.prime.clone(),
-            })
-        }
-    }
-}
-
-impl Div for FieldElement {
-    type Output = Result<FieldElement>;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        if self.prime != rhs.prime {
-            Err(anyhow!("Cannot add two numbers in different Fields"))
-        } else {
-            let num = (self.num * rhs.num.modpow(&self.prime.sub(2), &rhs.prime)) % &rhs.prime;
-            Ok(Self {
-                num,
-                prime: rhs.prime,
-            })
-        }
-    }
-}
-
-impl Mul for FieldElement {
-    type Output = Result<FieldElement>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.prime != rhs.prime {
-            Err(anyhow!("Cannot add two numbers in different Fields"))
-        } else {
-            Ok(Self {
-                num: self.num.mul(rhs.num).mod_floor(&self.prime),
-                ..self
             })
         }
     }
@@ -130,47 +104,143 @@ impl Sub for FieldElement {
     }
 }
 
-impl Add for FieldElement {
+impl Sub<&FieldElement> for FieldElement {
     type Output = Result<FieldElement>;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn sub(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else if self.num >= rhs.num {
+            Ok(FieldElement {
+                num: (&self.num).sub(&rhs.num),
+                prime: self.prime,
+            })
+        } else {
+            Ok(FieldElement {
+                num: &rhs.prime - (&rhs.num).sub(&self.num),
+                prime: self.prime,
+            })
+        }
+    }
+}
+
+impl Sub<&FieldElement> for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn sub(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else if self.num >= rhs.num {
+            Ok(FieldElement {
+                num: (&self.num).sub(&rhs.num),
+                prime: self.prime.clone(),
+            })
+        } else {
+            Ok(FieldElement {
+                num: &rhs.prime - (&rhs.num).sub(&self.num),
+                prime: rhs.prime.clone(),
+            })
+        }
+    }
+}
+
+impl Div for FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            let num = (self.num * rhs.num.modpow(&self.prime.sub(2), &rhs.prime)) % &rhs.prime;
+            Ok(Self {
+                num,
+                prime: rhs.prime,
+            })
+        }
+    }
+}
+
+impl Div<&FieldElement> for FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn div(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            let num = (&self.num
+                * &(rhs.num).modpow(&(&self.prime).sub(&BigInt::from(2)), &rhs.prime))
+                % &rhs.prime;
+            Ok(FieldElement {
+                num,
+                prime: self.prime,
+            })
+        }
+    }
+}
+
+impl Div<&FieldElement> for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn div(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            let num = (&self.num
+                * &(rhs.num).modpow(&(&self.prime).sub(&BigInt::from(2)), &rhs.prime))
+                % &rhs.prime;
+            Ok(FieldElement {
+                num,
+                prime: self.prime.clone(),
+            })
+        }
+    }
+}
+
+impl Mul for FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
         if self.prime != rhs.prime {
             Err(anyhow!("Cannot add two numbers in different Fields"))
         } else {
             Ok(Self {
-                num: self.num.add(rhs.num).mod_floor(&self.prime),
+                num: self.num.mul(rhs.num).mod_floor(&self.prime),
                 ..self
             })
         }
     }
 }
 
-impl FieldElement {
-    pub fn new(num: impl Into<BigInt>, prime: impl Into<BigInt>) -> Result<Self> {
-        let (num, prime) = (num.into(), prime.into());
-        if prime.lt(&num) {
-            Err(anyhow!(
-                "prime should be gt value, got num: {num}, prime: {prime}"
-            ))
-        } else {
-            Ok(Self { num, prime })
-        }
-    }
+impl Mul<&FieldElement> for FieldElement {
+    type Output = Result<FieldElement>;
 
-    pub fn pow(&self, rhs: impl Into<BigInt>) -> Self {
-        let exponent = rhs.into();
-        let exponent = if exponent.lt(&0i32.into()) {
-            BigInt::from(-1i64).add(&self.prime).add(&exponent)
+    fn mul(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
         } else {
-            exponent
-        };
-
-        Self {
-            num: self.num.modpow(&exponent, &self.prime),
-            prime: self.prime.clone(),
+            Ok(FieldElement {
+                num: (&self.num).mul(&rhs.num).mod_floor(&self.prime),
+                prime: self.prime,
+            })
         }
     }
 }
+
+impl Mul<&FieldElement> for &FieldElement {
+    type Output = Result<FieldElement>;
+
+    fn mul(self, rhs: &FieldElement) -> Self::Output {
+        if self.prime != rhs.prime {
+            Err(anyhow!("Cannot add two numbers in different Fields"))
+        } else {
+            Ok(FieldElement {
+                num: (&self.num).mul(&rhs.num).mod_floor(&self.prime),
+                prime: self.prime.clone(),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
