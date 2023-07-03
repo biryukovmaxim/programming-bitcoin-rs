@@ -66,7 +66,7 @@ impl Mul<&BigInt> for &Point {
 
     fn mul(self, rhs: &BigInt) -> Self::Output {
         if rhs == &BigInt::default() {
-            todo!()
+            return Point::new(None, self.curve.clone()).unwrap();
         }
         let mut cursor = BigInt::from(1);
         let mut res = self.clone();
