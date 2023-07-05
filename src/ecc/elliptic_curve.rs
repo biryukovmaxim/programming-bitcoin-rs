@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Error};
 use num_bigint::BigInt;
 use std::ops::Add;
 
@@ -131,9 +132,11 @@ impl Coordinate {
 }
 
 impl Point {
-    pub fn new(coordinate: Option<Coordinate>, curve: Curve) -> Result<Point, ()> {
+    pub fn new(coordinate: Option<Coordinate>, curve: Curve) -> Result<Point, Error> {
         match &coordinate {
-            Some(Coordinate { x, y }) if y.pow(2) != x.pow(3) + &curve.a * x + &curve.b => Err(()),
+            Some(Coordinate { x, y }) if y.pow(2) != x.pow(3) + &curve.a * x + &curve.b => {
+                Err(anyhow!("Invalid point coordinates"))
+            }
             _ => Ok(Self { coordinate, curve }),
         }
     }
