@@ -276,6 +276,9 @@ mod tests {
     #[test]
     fn test_sub() {
         let a = FieldElement::new(29u64, 31u64).unwrap();
+        assert_eq!((&a).sub(&a).unwrap(), FieldElement::new(0, 31u64).unwrap());
+
+        let a = FieldElement::new(29u64, 31u64).unwrap();
         let b = FieldElement::new(4u64, 31u64).unwrap();
         assert_eq!(a.sub(b).unwrap(), FieldElement::new(25u64, 31u64).unwrap());
 
