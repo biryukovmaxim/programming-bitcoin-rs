@@ -21,8 +21,8 @@ impl CurveOverFiniteField {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Coordinate {
-    x: FieldElement,
-    y: FieldElement,
+    pub x: FieldElement,
+    pub y: FieldElement,
 }
 
 impl<X: Into<FieldElement>, Y: Into<FieldElement>> From<(X, Y)> for Coordinate {

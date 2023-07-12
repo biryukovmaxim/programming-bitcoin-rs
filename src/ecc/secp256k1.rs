@@ -7,7 +7,7 @@ use anyhow::Result;
 use hex_literal::hex;
 use num_bigint::BigInt;
 use num_integer::Integer;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 use lazy_static::lazy_static;
 
@@ -67,6 +67,42 @@ impl From<Coordinate> for ECCoordinate {
 #[derive(Debug, Clone)]
 pub struct Point(ECPoint);
 
+impl PartialEq<Point> for Point {
+    fn eq(&self, other: &Point) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl PartialEq<&Point> for Point {
+    fn eq(&self, other: &&Point) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Add for Point {
+    type Output = Result<Point>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.0 + rhs.0).map(Point)
+    }
+}
+
+impl Add<&Point> for Point {
+    type Output = Result<Point>;
+
+    fn add(self, rhs: &Point) -> Self::Output {
+        (&self.0 + &rhs.0).map(Point)
+    }
+}
+
+impl Add<&Point> for &Point {
+    type Output = Result<Point>;
+
+    fn add(self, rhs: &Point) -> Self::Output {
+        (&self.0 + &rhs.0).map(Point)
+    }
+}
+
 impl Point {
     pub fn new(coordinate: Option<Coordinate>) -> Result<Self> {
         ECPoint::new(
@@ -78,6 +114,20 @@ impl Point {
 
     pub fn coordinate(&self) -> Option<&ECCoordinate> {
         self.0.coordinate.as_ref()
+    }
+
+    pub fn verify(&self, z: BigInt, sig: Signature) -> bool {
+        let s_inv = sig.s.modpow(&(&*N - 2), &N);
+        let u = (z * &s_inv).mod_floor(&N);
+        let v = (&sig.r * &s_inv).mod_floor(&N);
+        let total = &*G * &u + self * &v;
+        total
+            .map(|p| {
+                p.coordinate()
+                    .map(|ECCoordinate { x, .. }| x.num == sig.r)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -103,6 +153,12 @@ impl Mul<&BigInt> for &Point {
     fn mul(self, rhs: &BigInt) -> Self::Output {
         Point((&self.0).mul(&rhs.mod_floor(&N)))
     }
+}
+
+#[derive(Debug, Default)]
+pub struct Signature {
+    r: BigInt,
+    s: BigInt,
 }
 
 #[cfg(test)]
