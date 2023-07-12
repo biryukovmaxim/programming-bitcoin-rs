@@ -9,8 +9,11 @@ use num_bigint::{BigInt, RandBigInt, Sign};
 use num_integer::Integer;
 use std::ops::{Add, Div, Mul};
 
+use crate::ecc::secp256k1::sec_format::SecFormat;
 use lazy_static::lazy_static;
 use rand::thread_rng;
+
+pub mod sec_format;
 
 const _N: [u8; 32] = hex!("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
 const _A: u64 = 0;
@@ -211,11 +214,17 @@ impl PrivateKey {
         let s = if s > (&*N).div(2) { &*N - s } else { s };
         Some(Signature { r, s })
     }
+
+    /// returns the binary version of the SEC format
+    pub fn sec<F: SecFormat>(&self) -> F::Output {
+        F::sec(self)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ecc::secp256k1::sec_format::{Compressed, Uncompressed};
 
     #[test]
     fn test_infinity() {
@@ -258,9 +267,50 @@ mod tests {
     }
     #[test]
     fn test_sign() {
-        let pk = PrivateKey::new(thread_rng().gen_bigint(129));
-        let z = thread_rng().gen_bigint_range(&BigInt::from(0), &BigInt::from(2).pow(256));
-        let sig = pk.sign(&z).unwrap();
-        assert!(pk.point.verify(&z, &sig))
+        (0..5).into_iter().for_each(|_| {
+            let pk = PrivateKey::new(thread_rng().gen_bigint(129));
+            let z = thread_rng().gen_bigint_range(&BigInt::from(0), &BigInt::from(2).pow(256));
+            let sig = pk.sign(&z).unwrap();
+            assert!(pk.point.verify(&z, &sig))
+        });
+    }
+
+    #[test]
+    fn test_sec_uncompressed() {
+        let secrets = [
+            BigInt::from(5000),
+            BigInt::from(2018).pow(5),
+            BigInt::from_bytes_be(Sign::Plus, hex!("0deadbeef12345").as_slice()),
+        ];
+        let expected_secs = [
+            "04ffe558e388852f0120e46af2d1b370f85854a8eb0841811ece0e3e03d282d57c315dc72890a4f10a1481c031b03b351b0dc79901ca18a00cf009dbdb157a1d10",
+            "04027f3da1918455e03c46f659266a1bb5204e959db7364d2f473bdf8f0a13cc9dff87647fd023c13b4a4994f17691895806e1b40b57f4fd22581a4f46851f3b06",
+            "04d90cd625ee87dd38656dd95cf79f65f60f7273b67d3096e68bd81e4f5342691f842efa762fd59961d0e99803c61edba8b3e3f7dc3a341836f97733aebf987121"
+        ];
+
+        for (idx, secret) in secrets.iter().enumerate() {
+            let pk = PrivateKey::new(secret.clone());
+            let actual = hex::encode(pk.sec::<Uncompressed>().unwrap());
+            assert_eq!(actual, expected_secs[idx]);
+        }
+    }
+    #[test]
+    fn test_sec_compressed() {
+        let secrets = [
+            BigInt::from(5001),
+            BigInt::from(2019).pow(5),
+            BigInt::from_bytes_be(Sign::Plus, hex!("0deadbeef54321").as_slice()),
+        ];
+
+        let expected_secs = [
+            "0357a4f368868a8a6d572991e484e664810ff14c05c0fa023275251151fe0e53d1",
+            "02933ec2d2b111b92737ec12f1c5d20f3233a0ad21cd8b36d0bca7a0cfa5cb8701",
+            "0296be5b1292f6c856b3c5654e886fc13511462059089cdf9c479623bfcbe77690",
+        ];
+        for (idx, secret) in secrets.iter().enumerate() {
+            let pk = PrivateKey::new(secret.clone());
+            let actual = hex::encode(pk.sec::<Compressed>().unwrap());
+            assert_eq!(actual, expected_secs[idx]);
+        }
     }
 }
