@@ -69,11 +69,17 @@ impl Mul<&BigInt> for &Point {
         if rhs == &BigInt::default() {
             return Point::new(None, self.curve.clone()).unwrap();
         }
-        let mut cursor = BigInt::from(1);
-        let mut res = self.clone();
-        while &cursor < rhs {
-            res = (res + self).unwrap();
-            cursor += 1;
+        let mut rhs = rhs.clone();
+        let mut current = self.clone();
+        let zero = BigInt::from(0);
+        let one = BigInt::from(1);
+        let mut res = Point::new(None, self.curve.clone()).unwrap();
+        while rhs > zero {
+            if &rhs & &one > zero {
+                res = (&res + &current).unwrap();
+            }
+            current = (&current + &current).unwrap();
+            rhs = &rhs >> 1;
         }
         res
     }
