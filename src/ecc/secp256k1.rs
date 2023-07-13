@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use hex_literal::hex;
 use num_bigint::{BigInt, RandBigInt, Sign};
 use num_integer::Integer;
+use std::collections::VecDeque;
 use std::ops::{Add, Div, Mul};
 
 use crate::ecc::secp256k1::sec_format::SecFormat;
@@ -233,6 +234,40 @@ impl Signature {
     pub fn new(r: BigInt, s: BigInt) -> Self {
         Self { r, s }
     }
+
+    pub fn der(&self) -> Vec<u8> {
+        let encode = |big: &BigInt| {
+            let (_, r) = big.to_bytes_be();
+            let r_stripped = r.as_slice();
+            if r_stripped.first().unwrap() > &b'\x80' {
+                let mut r = vec![b'\x00'];
+                r.extend_from_slice(r_stripped);
+                r
+            } else {
+                r
+            }
+        };
+        let r = encode(&self.r);
+        let s = encode(&self.s);
+        let mut res = VecDeque::new();
+        res.push_back(2);
+        res.extend(r.len().to_be_bytes().into_iter().skip_while(|v| *v == 0u8));
+        res.extend(r.iter());
+
+        res.push_back(2);
+        res.extend(s.len().to_be_bytes().into_iter().skip_while(|v| *v == 0u8));
+        res.extend(s.iter());
+
+        let length: Vec<u8> = res
+            .len()
+            .to_be_bytes()
+            .into_iter()
+            .skip_while(|v| *v == 0u8)
+            .collect();
+        length.into_iter().rev().for_each(|v| res.push_front(v));
+        res.push_front(b'\x30');
+        Vec::from(res)
+    }
 }
 
 #[derive(Debug)]
@@ -253,7 +288,7 @@ impl PrivateKey {
             coordinate: Some(ECCoordinate { x:FieldElement{num: r, ..}, .. }),
             ..
         }) = &*G * &k else {return None};
-        let k_inv = k.modpow(dbg!(&(dbg!(&*N) - 2)), &N);
+        let k_inv = k.modpow(&(&*N - 2), &N);
         let s = ((z + &r * &self.secret) * k_inv).mod_floor(&N);
         let s = if s > (&*N).div(2) { &*N - s } else { s };
         Some(Signature { r, s })
@@ -356,5 +391,22 @@ mod tests {
             let actual = hex::encode(pk.sec::<Compressed>().unwrap());
             assert_eq!(actual, expected_secs[idx]);
         }
+    }
+    #[test]
+    fn test_der() {
+        let sig = Signature::new(
+            BigInt::from_bytes_be(
+                Sign::Plus,
+                hex!("37206a0610995c58074999cb9767b87af4c4978db68c06e8e6e81d282047a7c6").as_slice(),
+            ),
+            BigInt::from_bytes_be(
+                Sign::Plus,
+                hex!("8ca63759c1157ebeaec0d03cecca119fc9a75bf8e6d0fa65c841c8e2738cdaec").as_slice(),
+            ),
+        );
+        assert_eq!(
+           sig.der(),
+            hex!("3045022037206a0610995c58074999cb9767b87af4c4978db68c06e8e6e81d282047a7c60221008ca63759c1157ebeaec0d03cecca119fc9a75bf8e6d0fa65c841c8e2738cdaec")
+        );
     }
 }
