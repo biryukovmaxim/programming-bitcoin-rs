@@ -3,7 +3,7 @@ use crate::{
     ecc::elliptic_curve_finite_field::Coordinate as ECCoordinate,
     ecc::elliptic_curve_finite_field::CurveOverFiniteField, ecc::finite_field::FieldElement,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use hex_literal::hex;
 use num_bigint::{BigInt, RandBigInt, Sign};
 use num_integer::Integer;
@@ -54,6 +54,12 @@ impl Field {
     pub fn new(num: impl Into<BigInt>) -> Self {
         Field(FieldElement::new(num, P.clone()))
     }
+    pub fn sqrt(&self) -> Self {
+        Field(self.0.pow((&*P + BigInt::from(1)) / 4))
+    }
+    pub fn pow<T: Into<BigInt>>(&self, rhs: T) -> Self {
+        Field(self.0.pow(rhs))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -84,6 +90,44 @@ impl<XT: Into<BigInt>, YT: Into<BigInt>> From<(XT, YT)> for Coordinate {
 
 #[derive(Debug, Clone)]
 pub struct Point(ECPoint);
+
+impl TryFrom<&[u8]> for Point {
+    type Error = anyhow::Error;
+    /// returns a Point object from a SEC binary
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let Some(lead_byte) = value.first() else { return Err(anyhow!("empty input"))};
+        match lead_byte {
+            b'\x04' if value.len() < 65 => {
+                Err(anyhow!("unacceptable length of uncompressed sec signature"))
+            }
+            b'\x04' => Point::new(Some(Coordinate::from((
+                BigInt::from_bytes_be(Sign::Plus, &value[1..33]),
+                BigInt::from_bytes_be(Sign::Plus, &value[33..65]),
+            )))),
+            b'\x02' | b'\x03' if value.len() < 33 => {
+                Err(anyhow!("unacceptable length of compressed sec signature"))
+            }
+
+            b'\x02' | b'\x03' => {
+                let y_is_even = *lead_byte == b'\x02';
+                let x = Field::from(&value[1..33]);
+                let alpha: Field = Field((x.pow(3).0 + Field::new(B.clone()).0).unwrap());
+                let beta = alpha.sqrt();
+                let chosen_beta = {
+                    // choose even_beta
+                    if y_is_even && beta.0.num.is_even() {
+                        beta
+                    } else {
+                        // choose odd_beta
+                        Field::new(&*P - &beta.0.num)
+                    }
+                };
+                Point::new(Some(Coordinate::new(x, chosen_beta)))
+            }
+            _ => Err(anyhow!("unacceptable lead byte")),
+        }
+    }
+}
 
 impl Point {
     pub fn new(coordinate: Option<Coordinate>) -> Result<Self> {
